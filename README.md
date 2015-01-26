@@ -29,7 +29,7 @@ JBSoundRouter.routeSound(JBSoundRoute.Speaker)
 ```
 ### Objective-C
 ```objective-c
-	[JBSoundRouter routeSound:JBSoundRouteSpeaker];
+[JBSoundRouter routeSound:JBSoundRouteSpeaker];
 ```
 ## Swap to phone (ear) speake
 ### Swift
@@ -38,6 +38,6 @@ JBSoundRouter.routeSound(JBSoundRoute.PhoneSpeaker)
 ```
 ### Objective-C
 ```objective-c
-	[JBSoundRouter routeSound:JBSoundRoutePhoneSpeaker];
+[JBSoundRouter routeSound:JBSoundRoutePhoneSpeaker];
 ```
 
