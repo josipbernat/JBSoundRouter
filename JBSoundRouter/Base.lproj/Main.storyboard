@@ -35,11 +35,11 @@
                                     <constraint firstAttribute="height" constant="30" id="41A-35-vuv"/>
                                     <constraint firstAttribute="width" constant="165" id="HUg-V9-1FR"/>
                                 </constraints>
-                                <state key="normal" title="Route to phone speaker">
+                                <state key="normal" title="Route to receiver">
                                     <color key="titleShadowColor" white="0.5" alpha="1" colorSpace="calibratedWhite"/>
                                 </state>
                                 <connections>
-                                    <action selector="onRouteToPhoneSpeaker:" destination="vXZ-lx-hvc" eventType="touchUpInside" id="eHO-gN-5Y9"/>
+                                    <action selector="onRouteToReceiver:" destination="vXZ-lx-hvc" eventType="touchUpInside" id="XbP-PE-Hb3"/>
                                 </connections>
                             </button>
                         </subviews>

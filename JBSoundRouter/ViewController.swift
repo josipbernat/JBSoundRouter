@@ -44,9 +44,9 @@ class ViewController: UIViewController {
         JBSoundRouter.routeSound(JBSoundRoute.Speaker)
     }
 
-    @IBAction func onRouteToPhoneSpeaker(sender: AnyObject) {
+    @IBAction func onRouteToReceiver(sender: AnyObject) {
     
-        JBSoundRouter.routeSound(JBSoundRoute.PhoneSpeaker)
+        JBSoundRouter.routeSound(JBSoundRoute.Receiver)
     }
 }
 

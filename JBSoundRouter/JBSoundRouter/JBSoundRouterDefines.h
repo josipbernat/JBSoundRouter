@@ -11,8 +11,11 @@
 
 typedef NS_ENUM (NSInteger, JBSoundRoute) {
 
-    JBSoundRouteSpeaker = 0,
-    JBSoundRoutePhoneSpeaker
+    JBSoundRouteNotDefined  = 0,
+    JBSoundRouteSpeaker,
+    JBSoundRouteReceiver
 };
+
+#define kJBSoundRouterDidChangeRouteNotification    @"JBSoundRouterDidChangeRouteNotification"
 
 #endif

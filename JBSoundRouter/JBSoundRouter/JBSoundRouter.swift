@@ -10,16 +10,38 @@ import AVFoundation
 
 enum JBSoundRoute: Int {
 
-    case Speaker = 0
-    case PhoneSpeaker
+    case NotDefined = 0
+    case Speaker
+    case Receiver
 }
 
 @objc class JBSoundRouter: NSObject {
 
+    let JBSoundRouterDidChangeRouteNotification = "JBSoundRouterDidChangeRouteNotification"
+    
     class func routeSound(route: JBSoundRoute) {
     
         let instance: JBSoundRouter = self.sharedInstance
         instance.currentRoute = route
+    }
+    
+    class func currentSoundRoute() -> JBSoundRoute {
+        
+        let instance: JBSoundRouter = self.sharedInstance
+        return instance.currentRoute
+    }
+    
+    class func isHeadsetPluggedIn() -> Bool {
+        
+        var route: AVAudioSessionRouteDescription = AVAudioSession.sharedInstance().currentRoute
+        for port in route.outputs {
+            
+            let portDescription: AVAudioSessionPortDescription = port as AVAudioSessionPortDescription
+            if portDescription.portType == AVAudioSessionPortHeadphones || portDescription.portType == AVAudioSessionPortHeadsetMic {
+                return true
+            }
+        }
+        return false
     }
     
     //MARK: Shared Instance
@@ -44,18 +66,67 @@ enum JBSoundRoute: Int {
         
         super.init();
         
-        // Use mainQueue because in other case bad thing happens...
         NSNotificationCenter.defaultCenter().addObserverForName(
-            AVAudioSessionRouteChangeNotification,
-            object: nil,
+            AVAudioSessionRouteChangeNotification, object: nil,
             queue: NSOperationQueue.mainQueue()) { (note) -> Void in
                 
-                if AVAudioSession.sharedInstance().category != AVAudioSessionCategoryPlayback && self.currentRoute == JBSoundRoute.Speaker {
-                    self.currentRoute = JBSoundRoute.Speaker
+                let notification: NSNotification = note as NSNotification
+                var dict: Dictionary = notification.userInfo as Dictionary!
+                self.JBLog(String(format: "AVAudioSessionRouteChangeNotification received. UserInfo: %@", dict))
+                
+                self.__handleSessionRouteChangeNotification(note)
+        }
+        
+        NSNotificationCenter.defaultCenter().addObserverForName(
+            AVAudioSessionInterruptionNotification, object: nil,
+            queue: NSOperationQueue.mainQueue()) { (note) -> Void in
+                
+                let notification: NSNotification = note as NSNotification
+                var dict: Dictionary = notification.userInfo as Dictionary!
+                self.JBLog(String(format: "AVAudioSessionInterruptionNotification received. UserInfo: %@", dict))
+        }
+    }
+    
+    private func __handleSessionRouteChangeNotification(notification: NSNotification) {
+        
+        // Because userInfo is an optional we need to check it first.
+        if let info = notification.userInfo {
+            
+            var numberReason: NSNumber = info[AVAudioSessionRouteChangeReasonKey] as NSNumber
+            if let reason = AVAudioSessionRouteChangeReason(rawValue: UInt(numberReason.integerValue)) {
+                
+                switch (reason) {
+                    
+                case .Unknown:
+                    JBLog("AVAudioSessionRouteChangeReason.Unknown!")
+                    
+                case .CategoryChange:
+                    // We don't want infinite loop here
+                    break
+                    
+                case .NewDeviceAvailable:
+                    __updateSoundRoute(reason)
+                    JBLog("AVAudioSessionRouteChangeReason.NewDeviceAvailable")
+                    
+                case .OldDeviceUnavailable:
+                    __updateSoundRoute(reason)
+                    JBLog("AVAudioSessionRouteChangeReason.OldDeviceUnavailable")
+                    
+                case .Override:
+                    __updateSoundRoute(reason)
+                    JBLog("AVAudioSessionRouteChangeReason.Override")
+                    
+                case .RouteConfigurationChange:
+                    __updateSoundRoute(reason)
+                    JBLog("AVAudioSessionRouteChangeReason.RouteConfigurationChange")
+                    
+                case .WakeFromSleep:
+                    JBLog("AVAudioSessionRouteChangeReason.WakeFromSleep")
+                    
+                default:
+                    break
                 }
-                else if AVAudioSession.sharedInstance().category != AVAudioSessionCategoryPlayAndRecord && self.currentRoute == JBSoundRoute.PhoneSpeaker {
-                    self.currentRoute = JBSoundRoute.PhoneSpeaker
-                }
+            }
         }
     }
 
@@ -65,39 +136,63 @@ enum JBSoundRoute: Int {
     private var currentRoute: JBSoundRoute = JBSoundRoute.Speaker {
     
         didSet {
-            self.__routeSound(currentRoute)
+            
+            self.__updateSoundRoute(AVAudioSessionRouteChangeReason.Unknown)
+            NSNotificationCenter.defaultCenter().postNotificationName(JBSoundRouterDidChangeRouteNotification, object: nil)
         }
     }
     
     //MARK: Routing
     //MARK:
     
-    private func __routeSound(route: JBSoundRoute) -> Bool {
-    
-        var categoryError: NSError? = nil
+    private func __updateSoundRoute(reason: AVAudioSessionRouteChangeReason) {
+        
+        if reason == AVAudioSessionRouteChangeReason.NewDeviceAvailable {
+            
+            if JBSoundRouter.isHeadsetPluggedIn() == true {
+                self.currentRoute = JBSoundRoute.Receiver
+                return
+            }
+        }
+        else if reason == AVAudioSessionRouteChangeReason.OldDeviceUnavailable {
+            
+            if JBSoundRouter.isHeadsetPluggedIn() == false {
+                self.currentRoute = JBSoundRoute.Speaker
+                return
+            }
+        }
+        
         var session: AVAudioSession = AVAudioSession.sharedInstance()
         
-        if route == JBSoundRoute.PhoneSpeaker {
-            session.setCategory(AVAudioSessionCategoryPlayAndRecord, error: &categoryError)
+        if let route: AVAudioSessionRouteDescription = session.currentRoute {
+            
+            if let outputs = route.outputs {
+                
+                for port in route.outputs {
+                    
+                    let portDescription: AVAudioSessionPortDescription = port as AVAudioSessionPortDescription
+                    JBLog(portDescription.portType)
+                    
+                    if (self.currentRoute == JBSoundRoute.Receiver && portDescription.portType != AVAudioSessionPortBuiltInReceiver) {
+                        
+                        // Switch to Receiver
+                        var error: NSError? = nil
+                        session.overrideOutputAudioPort(AVAudioSessionPortOverride.None, error: &error)
+                    }
+                    else if (self.currentRoute == JBSoundRoute.Speaker && portDescription.portType != AVAudioSessionPortBuiltInSpeaker) {
+                        
+                        // Switch to Speaker
+                        var error: NSError? = nil
+                        session.overrideOutputAudioPort(AVAudioSessionPortOverride.Speaker, error: &error)
+                    }
+                }
+            }
         }
-        else if route == JBSoundRoute.Speaker {
-            session.setCategory(AVAudioSessionCategoryPlayback, error: &categoryError)
-        }
         
-        if categoryError != nil {
-            JBLog(String(format: "categoryError: %@", categoryError!))
-        }
+        session.setCategory(AVAudioSessionCategoryPlayAndRecord, error: nil)
         
-        var activationError: NSError? = nil
-        var successfull: Bool = session.setActive(true, error: &activationError)
-        
-        if activationError != nil {
-            JBLog(String(format: "activationError: %@", activationError!))
-        }
-        
-        JBLog(String(format: "successfull: %@", successfull.description))
-        
-        return successfull
+        var activeError: NSError? = nil
+        session.setActive(true, error: &activeError)
     }
     
     //MARK: Logging
